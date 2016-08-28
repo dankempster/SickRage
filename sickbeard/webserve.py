@@ -459,12 +459,8 @@ class WebRoot(WebHandler):
         return self.redirect("/schedule/")
 
     def setScheduleSort(self, sort):
-        if sort not in ('date', 'network', 'show'):
+        if sort not in ('date', 'network', 'show') or sickbeard.COMING_EPS_LAYOUT == 'calendar':
             sort = 'date'
-
-        if sickbeard.COMING_EPS_LAYOUT == 'calendar':
-            sort \
-                = 'date'
 
         sickbeard.COMING_EPS_SORT = sort
 
@@ -476,34 +472,6 @@ class WebRoot(WebHandler):
         results = ComingEpisodes.get_coming_episodes(ComingEpisodes.categories, sickbeard.COMING_EPS_SORT, False)
         today = datetime.datetime.now().replace(tzinfo=network_timezones.sb_timezone)
 
-        submenu = [
-            {
-                'title': _('Sort by:'),
-                'path': {
-                    'Date': 'setScheduleSort/?sort=date',
-                    'Show': 'setScheduleSort/?sort=show',
-                    'Network': 'setScheduleSort/?sort=network',
-                }
-            },
-            {
-                'title': _('Layout:'),
-                'path': {
-                    _('Banner'): 'setScheduleLayout/?layout=banner',
-                    _('Poster'): 'setScheduleLayout/?layout=poster',
-                    _('List'): 'setScheduleLayout/?layout=list',
-                    _('Calendar'): 'setScheduleLayout/?layout=calendar',
-                }
-            },
-            {
-                'title': _('View Paused:'),
-                'path': {
-                    _('Hide'): 'toggleScheduleDisplayPaused'
-                } if sickbeard.COMING_EPS_DISPLAY_PAUSED else {
-                    _('Show'): 'toggleScheduleDisplayPaused'
-                }
-            },
-        ]
-
         # Allow local overriding of layout parameter
         if layout and layout in ('poster', 'banner', 'list', 'calendar'):
             layout = layout
@@ -511,7 +479,7 @@ class WebRoot(WebHandler):
             layout = sickbeard.COMING_EPS_LAYOUT
 
         t = PageTemplate(rh=self, filename='schedule.mako')
-        return t.render(submenu=submenu, next_week=next_week1, today=today, results=results, layout=layout,
+        return t.render(next_week=next_week1, today=today, results=results, layout=layout,
                         title=_('Schedule'), header=_('Schedule'), topmenu='schedule',
                         controller="schedule", action="index")
 
@@ -1254,7 +1222,7 @@ class Home(WebRoot):
         )
 
         t = PageTemplate(rh=self, filename="displayShow.mako")
-        submenu = [{'title': _('Edit'), 'path': 'home/editShow?show={0:d}'.format(show_obj.indexerid), 'icon': 'ui-icon ui-icon-pencil'}]
+        submenu = [{'title': _('Edit'), 'path': 'home/editShow?show={0:d}'.format(show_obj.indexerid), 'icon': 'fa fa-pencil'}]
 
         try:
             showLoc = (show_obj.location, True)
@@ -1287,19 +1255,25 @@ class Home(WebRoot):
         if not sickbeard.showQueueScheduler.action.isBeingAdded(show_obj):
             if not sickbeard.showQueueScheduler.action.isBeingUpdated(show_obj):
                 if show_obj.paused:
-                    submenu.append({'title': _('Resume'), 'path': 'home/togglePause?show={0:d}'.format(show_obj.indexerid), 'icon': 'ui-icon ui-icon-play'})
+                    submenu.append({'title': _('Resume'), 'path': 'home/togglePause?show={0:d}'.format(show_obj.indexerid), 'icon': 'fa fa-play'})
                 else:
-                    submenu.append({'title': _('Pause'), 'path': 'home/togglePause?show={0:d}'.format(show_obj.indexerid), 'icon': 'ui-icon ui-icon-pause'})
+                    submenu.append({'title': _('Pause'), 'path': 'home/togglePause?show={0:d}'.format(show_obj.indexerid), 'icon': 'fa fa-pause'})
 
-                submenu.append({'title': _('Remove'), 'path': 'home/deleteShow?show={0:d}'.format(show_obj.indexerid), 'class': 'removeshow', 'confirm': True, 'icon': 'ui-icon ui-icon-trash'})
-                submenu.append({'title': _('Re-scan files'), 'path': 'home/refreshShow?show={0:d}'.format(show_obj.indexerid), 'icon': 'ui-icon ui-icon-refresh'})
-                submenu.append({'title': _('Force Full Update'), 'path': 'home/updateShow?show={0:d}&amp;force=1'.format(show_obj.indexerid), 'icon': 'ui-icon ui-icon-transfer-e-w'})
+                submenu.append({'title': _('Remove'), 'path': 'home/deleteShow?show={0:d}'.format(show_obj.indexerid), 'class': 'removeshow', 'confirm': True, 'icon': 'fa fa-trash'})
+                submenu.append({'title': _('Re-scan files'), 'path': 'home/refreshShow?show={0:d}'.format(show_obj.indexerid), 'icon': 'fa fa-refresh'})
+                submenu.append({'title': _('Force Full Update'), 'path': 'home/updateShow?show={0:d}&amp;force=1'.format(show_obj.indexerid), 'icon': 'fa fa-exchange'})
                 submenu.append({'title': _('Update show in KODI'), 'path': 'home/updateKODI?show={0:d}'.format(show_obj.indexerid), 'requires': self.haveKODI(), 'icon': 'menu-icon-kodi'})
                 submenu.append({'title': _('Update show in Emby'), 'path': 'home/updateEMBY?show={0:d}'.format(show_obj.indexerid), 'requires': self.haveEMBY(), 'icon': 'menu-icon-emby'})
-                submenu.append({'title': _('Preview Rename'), 'path': 'home/testRename?show={0:d}'.format(show_obj.indexerid), 'icon': 'ui-icon ui-icon-tag'})
+                if seasonResults and int(seasonResults[-1]["season"]) == 0:
+                    if sickbeard.DISPLAY_SHOW_SPECIALS:
+                        submenu.append({'title': _('Hide specials'), 'path': 'home/toggleDisplayShowSpecials/?show={0:d}'.format(show_obj.indexerid), 'confirm': True, 'icon': 'fa fa-times'})
+                    else:
+                        submenu.append({'title': _('Show specials'), 'path': 'home/toggleDisplayShowSpecials/?show={0:d}'.format(show_obj.indexerid), 'confirm': True, 'icon': 'fa fa-check'})
+
+                submenu.append({'title': _('Preview Rename'), 'path': 'home/testRename?show={0:d}'.format(show_obj.indexerid), 'icon': 'fa fa-tag'})
 
                 if sickbeard.USE_SUBTITLES and show_obj.subtitles and not sickbeard.showQueueScheduler.action.isBeingSubtitled(show_obj):
-                    submenu.append({'title': _('Download Subtitles'), 'path': 'home/subtitleShow?show={0:d}'.format(show_obj.indexerid), 'icon': 'menu-icon-backlog'})
+                    submenu.append({'title': _('Download Subtitles'), 'path': 'home/subtitleShow?show={0:d}'.format(show_obj.indexerid), 'icon': 'fa fa-language'})
 
         epCounts = {
             Overview.SKIPPED: 0,
@@ -2000,7 +1974,7 @@ class Home(WebRoot):
             show_obj = Show.find(sickbeard.showList, int(searchThread.show.indexerid))
 
             if not show_obj:
-                logger.log(u'No Show Object found for show with indexerID: ' + str(searchThread.show.indexerid), logger.ERROR)
+                logger.log(u'No Show Object found for show with indexerID: ' + str(searchThread.show.indexerid), logger.WARNING)
                 return results
 
             if isinstance(searchThread, sickbeard.search_queue.ManualSearchQueueItem):
@@ -2089,12 +2063,35 @@ class Home(WebRoot):
 
         if new_subtitles:
             new_languages = [subtitle_module.name_from_code(code) for code in new_subtitles]
-            status = _('New subtitles downloaded: {new_subtitle_languages}').format(new_subtitle_languages=', '.join(new_languages))
+            status = _('New subtitles downloaded: {new_subtitle_languages}').format(
+                new_subtitle_languages=', '.join(new_languages))
         else:
             status = _('No subtitles downloaded')
 
         ui.notifications.message(ep_obj.show.name, status)  # pylint: disable=no-member
         return json.dumps({'result': status, 'subtitles': ','.join(ep_obj.subtitles)})  # pylint: disable=no-member
+
+    def retrySearchSubtitles(self, show, season, episode, lang):
+        # retrieve the episode object and fail if we can't get one
+        ep_obj, error_msg = self._getEpisode(show, season, episode)
+        if error_msg or not ep_obj:
+            return json.dumps({'result': 'failure', 'errorMessage': error_msg})
+
+        try:
+            new_subtitles = ep_obj.download_subtitles(force_lang=lang)
+        except Exception as ex:
+            return json.dumps({'result': 'failure', 'errorMessage': ex.message})
+
+        if new_subtitles:
+            new_languages = [subtitle_module.name_from_code(code) for code in new_subtitles]
+            status = _('New subtitles downloaded: {new_subtitle_languages}').format(
+                new_subtitle_languages=', '.join(new_languages))
+        else:
+            status = _('No subtitles downloaded')
+
+        ui.notifications.message(ep_obj.show.name, status)
+        return json.dumps({'result': status, 'subtitles': ','.join(ep_obj.subtitles)})
+
 
     def setSceneNumbering(self, show, indexer, forSeason=None, forEpisode=None, forAbsolute=None, sceneSeason=None,
                           sceneEpisode=None, sceneAbsolute=None):
@@ -3700,8 +3697,8 @@ class History(WebRoot):
 
         t = PageTemplate(rh=self, filename="history.mako")
         submenu = [
-            {'title': _('Clear History'), 'path': 'history/clearHistory', 'icon': 'ui-icon ui-icon-trash', 'class': 'clearhistory', 'confirm': True},
-            {'title': _('Trim History'), 'path': 'history/trimHistory', 'icon': 'menu-icon-cut', 'class': 'trimhistory', 'confirm': True},
+            {'title': _('Clear History'), 'path': 'history/clearHistory', 'icon': 'fa fa-trash', 'class': 'clearhistory', 'confirm': True},
+            {'title': _('Trim History'), 'path': 'history/trimHistory', 'icon': 'fa fa-scissors', 'class': 'trimhistory', 'confirm': True},
         ]
 
         return t.render(historyResults=data, compactResults=compact, limit=limit,
@@ -3731,14 +3728,14 @@ class Config(WebRoot):
     @staticmethod
     def ConfigMenu():
         menu = [
-            {'title': _('General'), 'path': 'config/general/', 'icon': 'menu-icon-config'},
-            {'title': _('Backup/Restore'), 'path': 'config/backuprestore/', 'icon': 'menu-icon-backup'},
-            {'title': _('Search Settings'), 'path': 'config/search/', 'icon': 'menu-icon-manage-searches'},
-            {'title': _('Search Providers'), 'path': 'config/providers/', 'icon': 'menu-icon-provider'},
-            {'title': _('Subtitles Settings'), 'path': 'config/subtitles/', 'icon': 'menu-icon-backlog'},
-            {'title': _('Post Processing'), 'path': 'config/postProcessing/', 'icon': 'menu-icon-postprocess'},
-            {'title': _('Notifications'), 'path': 'config/notifications/', 'icon': 'menu-icon-notification'},
-            {'title': _('Anime'), 'path': 'config/anime/', 'icon': 'menu-icon-anime'},
+            {'title': _('General'), 'path': 'config/general/', 'icon': 'fa fa-cog'},
+            {'title': _('Backup/Restore'), 'path': 'config/backuprestore/', 'icon': 'fa fa-floppy-o'},
+            {'title': _('Search Settings'), 'path': 'config/search/', 'icon': 'fa fa-search'},
+            {'title': _('Search Providers'), 'path': 'config/providers/', 'icon': 'fa fa-plug'},
+            {'title': _('Subtitles Settings'), 'path': 'config/subtitles/', 'icon': 'fa fa-language'},
+            {'title': _('Post Processing'), 'path': 'config/postProcessing/', 'icon': 'fa fa-refresh'},
+            {'title': _('Notifications'), 'path': 'config/notifications/', 'icon': 'fa fa-bell-o'},
+            {'title': _('Anime'), 'path': 'config/anime/', 'icon': 'fa fa-eye'},
         ]
 
         return menu
@@ -4800,6 +4797,12 @@ class ConfigProviders(Config):
                         kwargs[curTorrentProvider.get_id() + '_subtitle'])
                 except Exception:
                     curTorrentProvider.subtitle = 0
+
+            if curTorrentProvider.enable_cookies:
+                try:
+                    curTorrentProvider.cookies = str(kwargs['{id}_cookies'.format(id=curTorrentProvider.get_id())]).strip()
+                except Exception:
+                    pass  # I don't want to configure a default value here, as it can also be configured intially as a custom rss torrent provider
 
         for curNzbProvider in [prov for prov in sickbeard.providers.sortedProviderList() if
                                prov.provider_type == GenericProvider.NZB]:
